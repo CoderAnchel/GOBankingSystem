@@ -1,7 +1,9 @@
 # GO Banking System
 ![banking ada](https://github.com/user-attachments/assets/f7f8853f-2a74-4794-b3ff-fed06399c34c)
 
-Sistema bancario desarrollada en Go (Golang) que proporciona funcionalidades bancarias y de trading, utilizando una arquitectura basada en REST API para manejar las interacciones entre los usuarios y el sistema.
+> Sistema bancario desarrollada en Go (Golang) que proporciona funcionalidades bancarias y de trading, utilizando una arquitectura basada en REST API para manejar las interacciones entre los usuarios y el sistema.
+
+Hace dos meses me enfrenté a un reto de **Backend en Java** en la **hackathon** organizada por ***CaixaBank Tech**.* Sabía que no iba a competir, sino a **aprender** lo que pudiera. Iba con la mentalidad abierta, consciente de que me enfrentaría a cosas que nunca había hecho, en un lenguaje con el que apenas estaba empezando a trabajar y sabiendo que aún no había implementado JWT en ningún backend. Como era de esperar, tuve que enfrentarme a situaciones de las que no tenía ni idea de cómo funcionaban. Hice lo que pude y fueron dos días muy intensos de aprender Java y Spring 😅. Un mes y medio más tarde, comenzó a despertar en mí un gran interés por **Go**, ya que es un **lenguaje rápido** y **muy potente**, sin la necesidad de frameworks, solo con lo que ofrece el lenguaje en sí. No sé si es más sencillo, pero sí que es **distinto** al paradigma orientado a objetos de Java, con una sintaxis mucho más reducida y una mayor velocidad. Pensé que sería una buena idea **intentar recrear ese proyecto de CaixaBank en Go** y profundizar más en el lenguaje, explorando **cómo se comporta a la hora de desarrollar proyectos más complejos,** más allá de hacer un CLI básico o una API REST sin autenticación, etc. Dicho esto, aquí está lo que se pedía en aquella hackathon, adaptado a Go y convertido en mi proyecto de **aplicación bancaria construida en Golang con Fiber.** Espero que le sirva a alguien para aprender y animo a todo el mundo a **probar cosas nuevas** 🚀.
 
 ## 🎯 Tareas
 1. **Tarea 1**: Acciones de Usuario
