@@ -13,7 +13,7 @@ import (
 
 // modelo creacion user
 type User struct {
-	AccountNUM  string
+	UserNUM     string
 	Name        string `json:"name" validate:"required"`
 	Password    string `json:"password" validate:"required"`
 	Email       string `json:"email" validate:"required,email"`
@@ -21,14 +21,76 @@ type User struct {
 	PhoneNumber string `json:"phoneNumber" validate:"required"`
 }
 
+type Account struct {
+	UserNum    string
+	AccountNum string
+	balance    float64
+}
+
 type Validation struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
 
+type Transfer struct {
+	From     string
+	To       string
+	Coin     string  `json:"coin" validate:"required"`
+	Quantity float64 `json:"quantity" validate:"required"`
+}
+
 var listaUsuarios []User
-var accouts []User
+var listaAccouts []Account
+var transferList []Transfer
 var validate = validator.New()
+
+func transferTest(c *fiber.Ctx) error {
+	transfer := Transfer{}
+
+	if err := c.BodyParser(&transfer); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"Error": "Error generating transacction",
+		})
+	}
+
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userNum := claims["userNumber"].(string)
+	for _, user := range listaAccouts {
+		if userNum == user.UserNum {
+
+			transfer.To = user.UserNum
+			user.balance += transfer.Quantity
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"accountNumber": user.AccountNum,
+				"balance":       user.balance,
+			})
+		}
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		"ERROR": "Transfer error :/",
+	})
+}
+
+func getAccount(c *fiber.Ctx) error {
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userNum := claims["userNumber"].(string)
+
+	for _, user := range listaAccouts {
+		if userNum == user.UserNum {
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"accountNumber": user.AccountNum,
+				"balance":       user.balance,
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+		"error": "no accounts asociated",
+	})
+}
 
 // "log-in"XD
 func login(c *fiber.Ctx) error {
@@ -49,12 +111,12 @@ func login(c *fiber.Ctx) error {
 		fmt.Println("Comparing user: " + user.Email + " " + user.Password + "with: " + validation.Email + " " + validation.Password)
 		if validation.Email == user.Email && validation.Password == user.Password {
 			claims := jwt.MapClaims{
-				"name":          user.Name,
-				"email":         user.Email,
-				"phoneNumber":   user.Email,
-				"address":       user.Address,
-				"accountNumber": user.AccountNUM,
-				"password":      user.Password,
+				"name":        user.Name,
+				"email":       user.Email,
+				"phoneNumber": user.Email,
+				"address":     user.Address,
+				"userNumber":  user.UserNUM,
+				"password":    user.Password,
 			}
 
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -69,13 +131,14 @@ func login(c *fiber.Ctx) error {
 		}
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-		"error": "BIG ERROR",
+		"error": "Usuario o Contraseña Incorrecta",
 	})
 }
 
 // handle create user
 func handleCreateUser(c *fiber.Ctx) error {
 	user := User{}
+	account := Account{}
 	if err := c.BodyParser(&user); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Error pasing the body request",
@@ -104,8 +167,12 @@ func handleCreateUser(c *fiber.Ctx) error {
 
 	fmt.Println(user)
 
-	user.AccountNUM = uuid.NewString()
+	account.AccountNum = uuid.NewString()
+	user.UserNUM = uuid.NewString()
+	account.UserNum = user.UserNUM
+	account.balance = 0
 	listaUsuarios = append(listaUsuarios, user)
+	listaAccouts = append(listaAccouts, account)
 	return c.Status(fiber.StatusOK).JSON(user)
 }
 
@@ -113,7 +180,8 @@ func restricted(c *fiber.Ctx) error {
 	user := c.Locals("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
 	name := claims["name"].(string)
-	return c.SendString("Welcome, " + name)
+	email := claims["email"].(string)
+	return c.SendString("Welcome, " + name + " " + email)
 }
 
 func main() {
@@ -131,7 +199,11 @@ func main() {
 		SigningKey: jwtware.SigningKey{Key: []byte("secret")},
 	}))
 
+	app.Get("/checkAccounts", getAccount)
+
 	app.Get("/restricted", restricted)
+
+	app.Post("/transferTest", transferTest)
 
 	app.Get("/users", func(c *fiber.Ctx) error {
 		return c.JSON(listaUsuarios)
