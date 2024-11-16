@@ -1,8 +1,8 @@
 module bankingsystem
 
 go 1.21
-// toolchain directive removed
 
+// toolchain directive removed
 
 require (
 	github.com/gofiber/contrib/jwt v1.0.10
