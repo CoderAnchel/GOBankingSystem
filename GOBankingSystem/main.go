@@ -30,7 +30,7 @@ type Account struct {
 	AccountNum   string
 	balance      float64
 	transferList []Transfer
-	assets       []Asset
+	Assets       map[string]Asset
 }
 
 type Validation struct {
@@ -47,6 +47,7 @@ type Transfer struct {
 	Coin            string  `json:"coin" validate:"required"`
 	Quantity        float64 `json:"quantity" validate:"required"`
 	Cost            float32
+	Price           float32
 }
 
 type AssetsPrice struct {
@@ -67,7 +68,7 @@ type AssetsPrice struct {
 type Asset struct {
 	Symbol         string
 	Quantity_Owned float64
-	Profit         string
+	Profit         float32
 	buyH           []Transfer
 }
 
@@ -77,12 +78,174 @@ type AssetsTrans struct {
 	Price       float32
 }
 
+type assetCheck struct {
+	AssetSymbol string
+}
+
 var symbolsList = []string{"AAPL", "GOOGL", "TSLA", "AMZN", "MSFT", "NFLX", "FB", "BTC", "ETH", "GOLD", "SILVER"}
 
 var listaUsuarios []User
 var listaAccouts []Account
 var globalTransferList []Transfer
 var validate = validator.New()
+
+func sellAsset(c *fiber.Ctx) error {
+	assetCheck := assetCheck{}
+	if err := c.BodyParser(&assetCheck); err != nil {
+		c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "ERROR WHILE PARSING DATA ❌ ",
+		})
+	}
+
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userNum := claims["userNumber"].(string)
+
+	for i := range listaAccouts {
+		account := &listaAccouts[i]
+
+		if account.UserNum == userNum {
+
+		}
+	}
+
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		"ERR:MSG": "ERROR WHILE PROCESSING PETITION ❌",
+	})
+}
+
+func checkAssetTrans(c *fiber.Ctx) error {
+	assetCheck := assetCheck{}
+	if err := c.BodyParser(&assetCheck); err != nil {
+		c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "ERROR WHILE PARSING DATA ❌ ",
+		})
+	}
+
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userNum := claims["userNumber"].(string)
+
+	//importing all of the actual stocks proces
+	prices := make(map[string]float32)
+
+	res, err := http.Get("https://faas-lon1-917a94a7.doserverless.co/api/v1/web/fn-e0f31110-7521-4cb9-86a2-645f66eefb63/default/market-prices-simulator")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "Error fetching data :/",
+		})
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return c.JSON("Error fetching data :/")
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&prices); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "Error decoding data :/",
+		})
+	}
+
+	for i := range listaAccouts {
+		account := listaAccouts[i]
+		if account.UserNum == userNum {
+			now := time.Now()
+			var actualPrice float32
+			if price, exists := prices[assetCheck.AssetSymbol]; exists {
+				actualPrice = price
+			}
+
+			if asset, exists := account.Assets[assetCheck.AssetSymbol]; exists {
+				for i := range asset.buyH {
+					costIfNow := actualPrice * float32(asset.buyH[i].Quantity)
+					if costIfNow < asset.buyH[i].Cost {
+						result := asset.buyH[i].Cost - costIfNow
+						asset.Profit += result
+					} else if costIfNow > asset.buyH[i].Cost {
+						result := costIfNow - asset.buyH[i].Cost
+						asset.Profit += result
+					}
+				}
+
+				response := fiber.Map{
+					"time":   now,
+					"buyH":   asset.buyH,
+					"profit": asset.Profit,
+				}
+
+				// Send the response
+				err := c.JSON(response)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}
+		}
+	}
+
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		"ERR:MSG": "ERROR WHILE SEARCHING DATA ❌ ",
+	})
+}
+
+func checkAssets(c *fiber.Ctx) error {
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userNum := claims["userNumber"].(string)
+
+	//importing all of the actual stocks proces
+	prices := make(map[string]float32)
+
+	res, err := http.Get("https://faas-lon1-917a94a7.doserverless.co/api/v1/web/fn-e0f31110-7521-4cb9-86a2-645f66eefb63/default/market-prices-simulator")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "Error fetching data :/",
+		})
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return c.JSON("Error fetching data :/")
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&prices); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "Error decoding data :/",
+		})
+	}
+	for i := range listaAccouts {
+		account := &listaAccouts[i]
+		if account.UserNum == userNum {
+			var actualPrice float32
+			for symbol, asset := range account.Assets {
+				asset.Profit = 0 // Reset profit before calculation
+				if price, exists := prices[asset.Symbol]; exists {
+					actualPrice = price
+				}
+
+				for j := range asset.buyH {
+					costIfNow := actualPrice * float32(asset.buyH[j].Quantity)
+					if costIfNow < asset.buyH[j].Cost {
+						result := asset.buyH[j].Cost - costIfNow
+						asset.Profit += result
+					} else if costIfNow > asset.buyH[j].Cost {
+						result := costIfNow - asset.buyH[j].Cost
+						asset.Profit += result
+					}
+				}
+				account.Assets[symbol] = asset
+			}
+
+			return c.Status(fiber.StatusOK).JSON(account.Assets)
+		}
+	}
+
+	return c.Status(fiber.StatusInternalServerError).JSON("ERROR :/")
+}
 
 func values(c *fiber.Ctx) error {
 	prices := AssetsPrice{}
@@ -118,7 +281,7 @@ func values(c *fiber.Ctx) error {
 }
 
 func buyAsset(c *fiber.Ctx) error {
-	asset := Asset{}
+	//asset := Asset{}
 	transaction := Transfer{}
 	assetsBuy := AssetsTrans{}
 	finded := false
@@ -162,6 +325,7 @@ func buyAsset(c *fiber.Ctx) error {
 		assetsBuy.Price = price
 		transaction.Coin = assetsBuy.AssetSymbol
 		transaction.Cost = price * assetsBuy.Amount
+		transaction.Price = price
 		finded = true
 	}
 
@@ -181,20 +345,29 @@ func buyAsset(c *fiber.Ctx) error {
 				transaction.TransactionType = "ASSETS_BUY"
 				account.balance -= float64(transaction.Cost)
 				account.transferList = append(account.transferList, transaction)
-				asset.Symbol = transaction.Coin
-				asset.Quantity_Owned += transaction.Quantity
-				asset.buyH = append(asset.buyH, transaction)
-				account.assets = append(account.assets, asset)
+
+				if asset, exists := account.Assets[assetsBuy.AssetSymbol]; exists {
+					asset.Symbol = transaction.Coin
+					asset.Quantity_Owned += transaction.Quantity
+					asset.buyH = append(asset.buyH, transaction)
+					account.Assets[assetsBuy.AssetSymbol] = asset
+				}
+				// asset.Symbol = transaction.Coin
+				// asset.Quantity_Owned += transaction.Quantity
+				// asset.buyH = append(asset.buyH, transaction)
+				// account.assets = append(account.assets, asset)
+
 				return c.Status(fiber.StatusOK).JSON(fiber.Map{
 					"status":              "ASSETS BUY COMPLETED  ✅",
 					"id":                  transaction.ID,
 					"asset SYMBOL":        transaction.Coin,
-					"assets number":       transaction.Quantity,
+					"assets quantity":     transaction.Quantity,
 					"transactionType":     transaction.TransactionType,
 					"transactionDate":     transaction.Date,
 					"sourceAccountNumber": transaction.From,
 					"targetAccountNumber": transaction.To,
-					"asset price":         transaction.Cost,
+					"assets cost":         transaction.Cost,
+					"assets price":        transaction.Price,
 				})
 			} else {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -485,10 +658,99 @@ func handleCreateUser(c *fiber.Ctx) error {
 
 	fmt.Println(user)
 
+	asset1 := Asset{
+		Symbol:         "AAPL",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset2 := Asset{
+		Symbol:         "GOOGL",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset3 := Asset{
+		Symbol:         "TSLA",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset4 := Asset{
+		Symbol:         "AMZN",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset5 := Asset{
+		Symbol:         "MSFT",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset6 := Asset{
+		Symbol:         "NFLX",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset7 := Asset{
+		Symbol:         "FB",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset8 := Asset{
+		Symbol:         "BTC",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset9 := Asset{
+		Symbol:         "ETH",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset10 := Asset{
+		Symbol:         "GOLD",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	asset11 := Asset{
+		Symbol:         "SILVER",
+		Quantity_Owned: 0,
+		Profit:         0,
+		buyH:           []Transfer{},
+	}
+
+	account.Assets = make(map[string]Asset)
 	account.AccountNum = uuid.NewString()
 	user.UserNUM = uuid.NewString()
 	account.UserNum = user.UserNUM
 	account.balance = 0
+	account.Assets["AAPL"] = asset1
+	account.Assets["GOOGL"] = asset2
+	account.Assets["TSLA"] = asset3
+	account.Assets["AMZN"] = asset4
+	account.Assets["MSFT"] = asset5
+	account.Assets["NFLX"] = asset6
+	account.Assets["FB"] = asset7
+	account.Assets["BTC"] = asset8
+	account.Assets["ETH"] = asset9
+	account.Assets["GOLD"] = asset10
+	account.Assets["SILVER"] = asset11
 	listaUsuarios = append(listaUsuarios, user)
 	listaAccouts = append(listaAccouts, account)
 	return c.Status(fiber.StatusOK).JSON(user)
@@ -504,15 +766,11 @@ func restricted(c *fiber.Ctx) error {
 
 func main() {
 	app := fiber.New()
-
 	app.Use(logger.New())
 
 	app.Post("/createuser", handleCreateUser)
-
 	app.Post("/login", login)
-
 	app.Static("/", "./public")
-
 	app.Get("/values", values)
 
 	app.Use(jwtware.New(jwtware.Config{
@@ -520,18 +778,17 @@ func main() {
 	}))
 
 	app.Get("/checkAccounts", getAccount)
-
 	app.Get("/restricted", restricted)
-
 	app.Post("/transferTest", transfer)
-
 	app.Post("/deposit", deposit)
 	app.Post("/withdraw", withdraw)
 	app.Get("/transacctionHistory", transacctionHistory)
 	app.Post("/buyassets", buyAsset)
-
+	app.Get("/checkAssets", checkAssets)
+	app.Post("/checkAssetTrans", checkAssetTrans)
 	app.Get("/users", func(c *fiber.Ctx) error {
 		return c.JSON(listaUsuarios)
 	})
+
 	app.Listen(":3000")
 }
