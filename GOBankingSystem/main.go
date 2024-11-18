@@ -26,11 +26,12 @@ type User struct {
 }
 
 type Account struct {
-	UserNum      string
-	AccountNum   string
-	balance      float64
-	transferList []Transfer
-	Assets       map[string]Asset
+	UserNum             string
+	AccountNum          string
+	balance             float64
+	transferList        []Transfer
+	privateTransferList []privateTransfer
+	Assets              map[string]Asset
 }
 
 type Validation struct {
@@ -39,6 +40,19 @@ type Validation struct {
 }
 
 type Transfer struct {
+	ID              string
+	TransactionType string
+	Date            string
+	From            string
+	To              string
+	Coin            string  `json:"coin" validate:"required"`
+	Quantity        float64 `json:"quantity" validate:"required"`
+	Cost            float32
+	Price           float32
+}
+
+// for selling assets
+type privateTransfer struct {
 	ID              string
 	TransactionType string
 	Date            string
@@ -89,6 +103,7 @@ var listaAccouts []Account
 var globalTransferList []Transfer
 var validate = validator.New()
 
+// in progress...
 func sellAsset(c *fiber.Ctx) error {
 	assetCheck := assetCheck{}
 	if err := c.BodyParser(&assetCheck); err != nil {
@@ -101,11 +116,64 @@ func sellAsset(c *fiber.Ctx) error {
 	claims := user.Claims.(jwt.MapClaims)
 	userNum := claims["userNumber"].(string)
 
+	//importing all of the actual stocks proces
+	prices := make(map[string]float32)
+
+	res, err := http.Get("https://faas-lon1-917a94a7.doserverless.co/api/v1/web/fn-e0f31110-7521-4cb9-86a2-645f66eefb63/default/market-prices-simulator")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "Error fetching data :/",
+		})
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return c.JSON("Error fetching data :/")
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&prices); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ERR:MSG": "Error decoding data :/",
+		})
+	}
+
 	for i := range listaAccouts {
 		account := &listaAccouts[i]
-
 		if account.UserNum == userNum {
+			now := time.Now()
+			var actualPrice float32
+			if price, exists := prices[assetCheck.AssetSymbol]; exists {
+				actualPrice = price
+			}
 
+			if asset, exists := account.Assets[assetCheck.AssetSymbol]; exists {
+				asset.Profit = 0
+				for i := range asset.buyH {
+					costIfNow := actualPrice * float32(asset.buyH[i].Quantity)
+					if costIfNow < asset.buyH[i].Cost {
+						result := asset.buyH[i].Cost - costIfNow
+						asset.Profit += result
+					} else if costIfNow > asset.buyH[i].Cost {
+						result := costIfNow - asset.buyH[i].Cost
+						asset.Profit += result
+					}
+				}
+
+				response := fiber.Map{
+					"time":       now,
+					"buyH":       asset.buyH,
+					"depostited": asset.Profit,
+				}
+
+				// Send the response
+				err := c.JSON(response)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}
 		}
 	}
 
@@ -114,6 +182,7 @@ func sellAsset(c *fiber.Ctx) error {
 	})
 }
 
+// change from the history to the actual liquidation list
 func checkAssetTrans(c *fiber.Ctx) error {
 	assetCheck := assetCheck{}
 	if err := c.BodyParser(&assetCheck); err != nil {
@@ -191,6 +260,7 @@ func checkAssetTrans(c *fiber.Ctx) error {
 	})
 }
 
+// change to liquidation list
 func checkAssets(c *fiber.Ctx) error {
 	user := c.Locals("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
@@ -280,6 +350,7 @@ func values(c *fiber.Ctx) error {
 	return c.JSON(prices)
 }
 
+// create transactionPrivate to
 func buyAsset(c *fiber.Ctx) error {
 	//asset := Asset{}
 	transaction := Transfer{}
