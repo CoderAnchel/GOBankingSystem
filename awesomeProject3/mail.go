@@ -18,8 +18,8 @@ type CardRelated struct {
 func sendEmail(c *fiber.Ctx) error {
 	auth := smtp.PlainAuth(
 		"",
-		"anchelxlaid@gmail.com",
-		"qiqt ajjj pwsl ybhq",
+		"x",
+		"x",
 		"smtp.gmail.com",
 	)
 
@@ -28,8 +28,8 @@ func sendEmail(c *fiber.Ctx) error {
 	err := smtp.SendMail(
 		"smtp.gmail.com:587",
 		auth,
-		"anchelxlaid@gmail.com",
-		[]string{"anchelxlaid@gmail.com"},
+		"x",
+		[]string{x},
 		[]byte(msg),
 	)
 
@@ -46,8 +46,8 @@ func sendEmail(c *fiber.Ctx) error {
 func sendNewFriendRequestEmail(name string) {
 	auth := smtp.PlainAuth(
 		"",
-		"anchelxlaid@gmail.com",
-		"qiqt ajjj pwsl ybhq",
+		"x",
+		"x",
 		"smtp.gmail.com",
 	)
 
@@ -56,8 +56,8 @@ func sendNewFriendRequestEmail(name string) {
 	smtp.SendMail(
 		"smtp.gmail.com:587",
 		auth,
-		"anchelxlaid@gmail.com",
-		[]string{"anchelxlaid@gmail.com"},
+		"x",
+		[]string{"x"},
 		[]byte(msg),
 	)
 }
@@ -71,9 +71,9 @@ func sendEmail2() {
 	emailBody := string(htmlContent)
 
 	subject := "Credit Card Created"
-	from := "anchelxlaid@gmail.com"
-	to := "anchelxlaid@gmail.com"
-	password := "qiqt ajjj pwsl ybhq"
+	from := "x"
+	to := "x"
+	password := "x"
 	smtpHost := "smtp.gmail.com"
 	smtpPort := "587"
 
